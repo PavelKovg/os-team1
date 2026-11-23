@@ -2,3 +2,5 @@
 /worker
 /client
 *.o
+jobs.log
+out
