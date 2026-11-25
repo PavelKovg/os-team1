@@ -2,7 +2,7 @@
 
 #include "journal.h"
 #include "protocol.h"
-#include "scheduler.h"
+#include "sheduler_policy3.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
