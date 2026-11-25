@@ -143,6 +143,9 @@ int main(int argc, char **argv)
         fprintf(stderr, "worker: cannot connect to %s:%s\n", argv[1], argv[2]);
         return 3;
     }
+    else {
+    	printf("Worker: connected to %s:%s, K=%d",argv[1],argv[2],concurrency);
+    }
 
     char hello[128];
     int hlen = snprintf(hello, sizeof(hello), "%s|%d\n", PROTO_MSG_WORKER_HELLO, concurrency);
@@ -193,7 +196,7 @@ int main(int argc, char **argv)
             }
         }
     }
-
+	
     close(fd);
     pthread_mutex_destroy(&link.write_mutex);
     return 0;
