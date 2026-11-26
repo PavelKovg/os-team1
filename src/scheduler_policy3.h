@@ -1,8 +1,8 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
-#include <pthread.h>
-#include <stddef.h>
+#include <pthread.h> // for POSIX threads 
+#include <stddef.h> // for Basic types and limits(Null, size_t)
 
 typedef struct Job {
     char id[32];
