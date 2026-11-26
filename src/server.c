@@ -2,7 +2,7 @@
 
 #include "journal.h"
 #include "protocol.h"
-#include "sheduler_policy3.h"
+#include "scheduler_policy3.h"
 
 #include <arpa/inet.h> // Provides byte-order conversion helpers (htonl, htons) between host and network byte order.
 #include <errno.h> 
