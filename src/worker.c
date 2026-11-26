@@ -3,7 +3,7 @@
 #include "protocol.h"
 
 #include <errno.h>
-#include <netdb.h>
+#include <netdb.h> // Provides host/service resolution (getaddrinfo, freeaddrinfo, struct addrinfo) so the worker can connect to a <host> and <port>.
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
