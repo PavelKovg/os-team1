@@ -4,19 +4,19 @@
 #include "protocol.h"
 #include "sheduler_policy3.h"
 
-#include <arpa/inet.h>
-#include <errno.h>
-#include <limits.h>
-#include <netinet/in.h>
+#include <arpa/inet.h> // Provides byte-order conversion helpers (htonl, htons) between host and network byte order.
+#include <errno.h> 
+#include <limits.h> // Provides integer range limits for strict numeric validation
+#include <netinet/in.h> // Provides IPv4/IPv6 address structures and constants
 #include <pthread.h>
-#include <signal.h>
+#include <signal.h> 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdlib.h> // Provides dynamic memory management
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <sys/socket.h> // Provides the socket API
+#include <sys/types.h>  // Provides system types (such as ssize_t) used by OS and networking calls.
+#include <unistd.h>     // Provides core POSIX system calls, notably close() for closing sockets and file descriptors.
 
 typedef enum {
     JOB_QUEUED = 0,
