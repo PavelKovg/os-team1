@@ -1,7 +1,7 @@
 
 #include "sheduler_policy3.h"
-#include <errno.h>
-#include <string.h>
+#include <errno.h> // access to standart error codes
+#include <string.h> 
 
 int scheduler_init(Scheduler *scheduler)
 {
