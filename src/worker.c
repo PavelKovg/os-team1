@@ -1,7 +1,10 @@
-#define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE
 
 #include "protocol.h"
 
+#include <poll.h>
+#include <limits.h>
+#include <time.h>
 #include <errno.h>
 #include <netdb.h>
 #include <pthread.h>
@@ -12,6 +15,10 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+#define OUT_CAP PROTO_MAX_OUTPUT
 
 typedef struct {
     int sock_fd;
@@ -22,6 +29,104 @@ typedef struct {
     WorkerLink *link;
     char job_id[32];
 } JobLinkArg;
+
+static long long now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+int run_job(const char *cmd, char *out, ssize_t *out_len, int *truncated, int* status, int timeout_sec, int *timed_out){
+	*timed_out=0;
+	*out_len=0;
+	*truncated=0;
+	*status=0;
+	int fd[2];
+	if(pipe2(fd,O_CLOEXEC)==-1){
+		return -1;
+	}
+	pid_t pid=fork();
+	if(pid<0){
+		close(fd[0]);
+		close(fd[1]);	
+		return -1;
+	}
+	else if (pid==0){
+		setpgid(0,0);
+		signal(SIGPIPE, SIG_DFL);
+		int dn = open("/dev/null", O_RDONLY);
+		if (dn > 0) { dup2(dn, 0); close(dn); }
+		dup2(fd[1],1);
+		dup2(fd[1],2);
+		close(fd[0]);
+		close(fd[1]);
+		execl("/bin/sh","sh","-c",cmd,(char *)NULL);
+		_exit(127);
+	}
+	else {
+		setpgid(pid,pid);
+		close(fd[1]);
+		
+		long long deadline = now_ms()+(long long)timeout_sec*1000; //deadline of how long job can be done in seconds
+		long long grace_end=0; //variable making sure parent don't hangs if pipe is failed to close
+		struct pollfd pf = { .fd = fd[0], .events = POLLIN, .revents = 0 }; //monitor read end of pipe to trigger when  there is data ready to read 
+		char buf[4096];
+		ssize_t n;
+		ssize_t already_read = 0;
+		
+		for (;;) {
+			long long limit = grace_end ? grace_end : deadline;
+			long long left = limit - now_ms();	//how much a job can run more
+			if (left < 0) left = 0;
+			if (left > INT_MAX) left = INT_MAX; 	//set time left into size of an int
+			int pr = poll(&pf, 1, (int)left); //wait for left seconds until 1 file descriptor that is pf ready to read
+			if (pr < 0) {
+				if (errno == EINTR) continue;
+				break;
+			}
+			if (pr == 0) {                    // no data arrived before the limit
+				if (now_ms() < limit) continue;	//if there is still time wait for more
+				if (grace_end) break;         // killed, but the pipe never closed 
+				*timed_out = 1;               // remember WHY, then kill 
+				kill(-pid, SIGKILL);          // kill the whole process group 
+				grace_end = now_ms() + 1000; //record that kill signal has been sent
+				continue;
+			}
+			n = read(fd[0], buf, sizeof(buf));
+			if (n < 0) {
+				if (errno == EINTR) continue;
+				break;
+			}
+			if (n == 0) break;                //EOF
+			if (already_read < OUT_CAP) {     // keep only the bites that fir OUT_CAP 
+				ssize_t room = OUT_CAP - already_read;
+				ssize_t take = n < room ? n : room;
+				memcpy(out + already_read, buf, (size_t)take); //write new bytes
+			}
+			already_read += n;                // count how many bytes are read
+		}
+		close(fd[0]);
+
+		*truncated = already_read > OUT_CAP;
+		if(*truncated){*out_len=(ssize_t)OUT_CAP;}
+		else{*out_len=already_read;}
+
+		struct timespec nap = { 0, 2 * 1000 * 1000 };   // 2ms 
+		for (;;) {
+			pid_t r = waitpid(pid, status, WNOHANG);
+			if (r == pid) break; //child has finished
+			if (r < 0 && errno != EINTR) return -1;
+			if (!grace_end && now_ms() >= deadline) {
+				*timed_out = 1; //job didnt make on time
+				kill(-pid, SIGKILL); //kill the whole child process
+				grace_end = now_ms() + 1000; //record that kill signal has been sent
+			}
+			nanosleep(&nap, NULL); //short a CPU usage because of infinite loop
+		}
+	return 0;
+	}
+}
 
 static int connect_tcp(const char *host, const char *port)
 {
@@ -144,7 +249,7 @@ int main(int argc, char **argv)
         return 3;
     }
     else {
-    	printf("Worker: connected to %s:%s, K=%d",argv[1],argv[2],concurrency);
+    	printf("worker: connected to %s:%s, K=%d\n",argv[1],argv[2],concurrency);
     }
 
     char hello[128];
