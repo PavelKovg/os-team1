@@ -232,7 +232,7 @@ static int read_response_fields(int fd, char *line, size_t line_size, char **fie
 
 static int handle_server_error(char **fields, int count, const char *job_id) {
 	if (count != 2 || strcmp(fields[0], PROTO_ERR) != 0)
-		goto protocol_error; // pzdc
+		goto protocol_error;
 
 	if (strcmp(fields[1], PROTO_ERR_UNKNOWN) == 0 && job_id != NULL) {
 		printf("%s UNKNOWN\n", job_id);
